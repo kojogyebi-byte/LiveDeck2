@@ -1,38 +1,28 @@
-# LiveDeck Studio (macOS)
+# LiveDeck Studio (macOS) — v1.2
 
-A native Mac live video production app: mix cameras, screen captures, video files and images; overlay animated lower thirds, tickers, countdowns, clocks, scoreboards, titles, logos and QR codes; record the program to MP4; and send a clean full-screen feed to a projector or streaming encoder.
+A native Mac live video production app: mix cameras, screen captures, video files and images; overlay animated graphics with reusable variants; monitor audio levels; record to MP4; and send a clean feed or a multiview to a second display. Built with Swift, SwiftUI, AVFoundation and ScreenCaptureKit. Requires macOS 13 Ventura or newer.
 
-Built with Swift, SwiftUI, AVFoundation and ScreenCaptureKit. Requires macOS 13 Ventura or newer.
+## Build it (no terminal needed)
 
-## How to build it (no terminal needed)
+1. Unzip this folder. Reveal the hidden `.github` folder in Finder with **Cmd+Shift+.**
+2. Create a repository on github.com (Private is fine), then **Add file → Upload files** and drag in everything *inside* the `LiveDeck` folder (so `Package.swift` sits at the repo root). **Commit changes.**
+3. Open the **Actions** tab. The build runs automatically (~4–6 min). The workflow also turns the included `AppIcon-1024.png` into a proper `.icns` and embeds it, so the app ships with its icon.
+4. Download the **LiveDeck-macOS** artifact, unzip, and the first time **right-click → Open → Open**.
+5. Grant Camera, Microphone and Screen Recording permissions.
 
-1. Create a new repository on github.com (private is fine).
-2. Upload this entire folder's contents to the repository, keeping the structure:
-   - `Package.swift`
-   - `Sources/LiveDeck/` (the four .swift files)
-   - `Resources/Info.plist`
-   - `.github/workflows/build.yml`
+## What's new in v1.2 (modelled on mimoLive)
 
-   Tip: when uploading via the GitHub web interface, drag the whole folder in so the paths are preserved. The `.github` folder is hidden on Mac — press Cmd+Shift+. in Finder to see it.
-3. Go to the repository's **Actions** tab. The build starts automatically on upload (or press "Run workflow").
-4. When the green check appears (about 3–5 minutes), open the run and download the **LiveDeck-macOS** artifact.
-5. Unzip it. The first time you open LiveDeck.app, **right-click → Open → Open** (it is ad-hoc signed, not notarized, so macOS asks once).
-6. Grant Camera, Microphone and Screen Recording permissions when prompted. Screen Recording may require a quit-and-reopen after granting (that's a macOS rule, not a bug).
+- **App icon** — a layered live-switcher mark, built into the bundle by the workflow.
+- **Program preview bar** — live resolution + fps readout, a green/red activity dot (turns red on REC), and a real-time **audio level meter** down the right edge (driven by your selected input).
+- **Safe-area guides** — toggle 90% / 80% guides over the preview (not recorded).
+- **Multiview window** — a broadcast-style grid of every source, with the on-air source ringed in red. Drag it to a second monitor.
+- **Layer variants** — mimoLive's signature feature: save multiple states per layer (e.g. each speaker's name and title) and switch or cycle them live with the ◀ ▶ buttons. Variants are saved inside your `.livedeck` show files.
+- **Output Destinations panel** — a unified row of outputs with live state, mirroring mimoLive's destinations list: Record (MP4), Program Window, and Still Image are active; Live Stream, NDI/Syphon and Virtual Camera are shown but disabled (they need licensed SDKs or a streaming relay — on the roadmap).
 
-## Using it
+## How layers work
 
-- **Sources (left):** add cameras (the Camera button lists every connected device, including USB capture cards that show up as webcams), full-screen captures, looping video files, images and solid colors. Press **TAKE** to switch the Program, with an optional crossfade.
-- **Layers (right):** add graphics with ＋. The red switch animates a layer on/off air. Top of the list renders in front. Click a layer to edit its text, colors, sizes and controls (countdown start/pause/reset, scoreboard +/−).
-- **REC (⌘R):** records Program video + microphone audio to an MP4 in your Movies folder (H.264/AAC — uploads straight to YouTube, plays anywhere).
-- **Snapshot:** saves a PNG of the program to your Desktop.
-- **Output Window:** a clean program feed. Drag it to a projector/second display and make it full screen, or capture this window in OBS / YouTube Studio's "stream from webcam" page to go live.
+Layers stack with the top of the list rendered in front. The red switch animates a layer on/off air. Click a layer to edit it; the **Variants** strip at the top of the inspector lets you snapshot the current look and recall it instantly during a service.
 
-## Current limitations (v1.0)
+## Still not included (honest scope)
 
-- Program output is fixed at 1280×720, 30 fps.
-- Recorded audio comes from the system default microphone (choose it in System Settings → Sound → Input). Audio from video files and screen captures plays out loud but is not yet mixed into the recording.
-- Direct RTMP streaming, NDI, Syphon, ATEM control and virtual-camera output are not included — those require licensed third-party SDKs and system extensions.
-
-## Roadmap candidates
-
-1080p output, multi-source audio mixer, picture-in-picture layouts, show save/load, lower-third style presets, and a built-in RTMP streamer (via a bundled ffmpeg).
+Direct RTMP streaming, NDI, Syphon, Blackmagic and virtual-camera output require third-party SDKs / system extensions and aren't bundled. Recorded audio is the single selected input device (route your mixer's USB feed there for a full board mix); multi-source in-app audio mixing is the next major item.

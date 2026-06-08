@@ -22,7 +22,6 @@ class Source: NSObject, ObservableObject, Identifiable {
         super.init()
     }
 
-    /// Latest video frame as CGImage (converted lazily).
     func currentImage() -> CGImage? {
         if let pb = latestBuffer {
             let ci = CIImage(cvPixelBuffer: pb)
@@ -32,7 +31,6 @@ class Source: NSObject, ObservableObject, Identifiable {
         return cachedImage
     }
 
-    /// Draw this source cover-fit into the context.
     func draw(in ctx: CGContext, width: Int, height: Int) {
         guard let img = currentImage() else { return }
         let iw = CGFloat(img.width), ih = CGFloat(img.height)
@@ -78,7 +76,7 @@ final class CameraSource: Source, AVCaptureVideoDataOutputSampleBufferDelegate {
     override func stop() { queue.async { [session] in session.stopRunning() } }
 }
 
-// MARK: - Screen capture (ScreenCaptureKit)
+// MARK: - Screen capture
 
 final class ScreenSource: Source, SCStreamOutput {
     private var stream: SCStream?
@@ -189,29 +187,56 @@ final class ColorSource: Source {
     }
 }
 
-// MARK: - Microphone capture (feeds the recorder)
+// MARK: - Audio capture (selectable device → feeds the recorder)
 
-final class MicCapture: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
-    private let session = AVCaptureSession()
-    private let queue = DispatchQueue(label: "mic.queue")
+struct AudioDeviceInfo: Identifiable, Hashable {
+    let id: String
+    let name: String
+}
+
+final class AudioCapture: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
+    private var session: AVCaptureSession?
+    private let queue = DispatchQueue(label: "audio.queue")
     var onSampleBuffer: ((CMSampleBuffer) -> Void)?
-    private(set) var isRunning = false
+    var onLevel: ((Float) -> Void)?   // 0...1, smoothed, delivered on main
+    private var smoothed: Float = 0
 
-    func start() {
-        guard !isRunning else { return }
-        guard let device = AVCaptureDevice.default(for: .audio),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
-        if session.canAddInput(input) { session.addInput(input) }
+    static func availableDevices() -> [AudioDeviceInfo] {
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInMicrophone, .externalUnknown],
+            mediaType: .audio, position: .unspecified)
+        return discovery.devices.map { AudioDeviceInfo(id: $0.uniqueID, name: $0.localizedName) }
+    }
+
+    func start(deviceID: String?) {
+        stop()
+        let device = deviceID.flatMap { AVCaptureDevice(uniqueID: $0) } ?? AVCaptureDevice.default(for: .audio)
+        guard let device, let input = try? AVCaptureDeviceInput(device: device) else { return }
+        let s = AVCaptureSession()
+        if s.canAddInput(input) { s.addInput(input) }
         let out = AVCaptureAudioDataOutput()
         out.setSampleBufferDelegate(self, queue: queue)
-        if session.canAddOutput(out) { session.addOutput(out) }
-        queue.async { [session] in session.startRunning() }
-        isRunning = true
+        if s.canAddOutput(out) { s.addOutput(out) }
+        queue.async { s.startRunning() }
+        session = s
+    }
+
+    func stop() {
+        session?.stopRunning()
+        session = nil
     }
 
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
         onSampleBuffer?(sampleBuffer)
+        // Level meter from the connection's audio channels (dBFS → 0...1)
+        if let ch = connection.audioChannels.first {
+            let db = ch.averagePowerLevel                       // typically -160...0 dBFS
+            let lin = Float(pow(10.0, Double(db) / 20.0))       // 0...1
+            smoothed = max(lin, smoothed * 0.82)                // fast attack, slow release
+            let level = min(1, max(0, smoothed))
+            DispatchQueue.main.async { [weak self] in self?.onLevel?(level) }
+        }
     }
 }
