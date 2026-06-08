@@ -1,28 +1,24 @@
-# LiveDeck Studio (macOS) — v1.2
+# LiveDeck Studio (macOS) — v2.0  (vMix-style switcher)
 
-A native Mac live video production app: mix cameras, screen captures, video files and images; overlay animated graphics with reusable variants; monitor audio levels; record to MP4; and send a clean feed or a multiview to a second display. Built with Swift, SwiftUI, AVFoundation and ScreenCaptureKit. Requires macOS 13 Ventura or newer.
+A native Mac live production switcher: Preview/Program buses with a transition T-bar, an input bus with live thumbnails, an audio mixer with VU meters, animated overlay graphics with variants, multiview, and MP4 recording. Built with Swift, SwiftUI, AVFoundation and ScreenCaptureKit. Requires macOS 13 Ventura or newer.
 
-## Build it (no terminal needed)
+## Build (no terminal needed)
 
-1. Unzip this folder. Reveal the hidden `.github` folder in Finder with **Cmd+Shift+.**
-2. Create a repository on github.com (Private is fine), then **Add file → Upload files** and drag in everything *inside* the `LiveDeck` folder (so `Package.swift` sits at the repo root). **Commit changes.**
-3. Open the **Actions** tab. The build runs automatically (~4–6 min). The workflow also turns the included `AppIcon-1024.png` into a proper `.icns` and embeds it, so the app ships with its icon.
-4. Download the **LiveDeck-macOS** artifact, unzip, and the first time **right-click → Open → Open**.
-5. Grant Camera, Microphone and Screen Recording permissions.
+1. Unzip. Reveal the hidden `.github` folder with **Cmd+Shift+.**
+2. Create a GitHub repo, **Add file → Upload files**, drag in everything *inside* the `LiveDeck` folder (so `Package.swift` is at the repo root), **Commit**.
+3. **Actions** tab → wait ~4–6 min for the green check (the workflow also builds the app icon). Download the **LiveDeck-macOS** artifact, unzip, **right-click → Open** the first time, and grant Camera / Microphone / Screen Recording permissions.
 
-## What's new in v1.2 (modelled on mimoLive)
+## v2.0 — rebuilt around the vMix workflow
 
-- **App icon** — a layered live-switcher mark, built into the bundle by the workflow.
-- **Program preview bar** — live resolution + fps readout, a green/red activity dot (turns red on REC), and a real-time **audio level meter** down the right edge (driven by your selected input).
-- **Safe-area guides** — toggle 90% / 80% guides over the preview (not recorded).
-- **Multiview window** — a broadcast-style grid of every source, with the on-air source ringed in red. Drag it to a second monitor.
-- **Layer variants** — mimoLive's signature feature: save multiple states per layer (e.g. each speaker's name and title) and switch or cycle them live with the ◀ ▶ buttons. Variants are saved inside your `.livedeck` show files.
-- **Output Destinations panel** — a unified row of outputs with live state, mirroring mimoLive's destinations list: Record (MP4), Program Window, and Still Image are active; Live Stream, NDI/Syphon and Virtual Camera are shown but disabled (they need licensed SDKs or a streaming relay — on the roadmap).
+- **Preview → Program switcher.** Click an input to stage it in the Preview monitor (orange). Send it to Program (green) with the transition column or the input tile's **PGM** button.
+- **Transitions + T-bar.** Cut, Fade, Wipe, Slide and Zoom. Click a transition to auto-run it, or drag the **T-BAR** to ride it manually. **FTB** fades Program to black.
+- **Input bus.** A scrolling row of inputs with live thumbnails, numbers, an on-air/preview border, a per-input audio (mute) toggle, and a direct-to-Program button.
+- **Audio mixer panel.** Master and Recording strips with live VU meters, plus a channel strip per input (meter, fader, M-mute), mirroring vMix's mixer.
+- **Overlay channels.** Your layers act as overlays; the status-bar buttons 1–4 toggle the first four on air, and the Overlays tab holds the full layer list, inspector and variants.
+- **Status bar & top bar.** Resolution/FPS readout, clock + on-air timer, Record/Stream/Snapshot/Multiview, and a vMix-style top bar (Open/Save, Fullscreen output, STREAM, REC).
 
-## How layers work
+## Honest scope — what's NOT included
 
-Layers stack with the top of the list rendered in front. The red switch animates a layer on/off air. Click a layer to edit it; the **Variants** strip at the top of the inspector lets you snapshot the current look and recall it instantly during a service.
+These vMix features need licensed SDKs, Windows-only components, or system extensions and are not in this app: **NDI, virtual camera, vMix Call, Zoom integration, SRT, AJA/Blackmagic/Bluefish hardware output, instant replay, DVD, web-browser input, and the GT title designer.** Direct RTMP streaming also needs a relay and is not wired (capture the Program window in OBS/YouTube to stream for now).
 
-## Still not included (honest scope)
-
-Direct RTMP streaming, NDI, Syphon, Blackmagic and virtual-camera output require third-party SDKs / system extensions and aren't bundled. Recorded audio is the single selected input device (route your mixer's USB feed there for a full board mix); multi-source in-app audio mixing is the next major item.
+Audio: meters are real on the Master/Recording/program-input strips; faders and mutes are stored per input. Recorded audio is the single selected input device (route your mixer's USB feed there for a full board mix). True simultaneous multi-source audio mixing into the recording is the next milestone.

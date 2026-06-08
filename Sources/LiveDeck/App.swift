@@ -8,7 +8,7 @@ struct LiveDeckApp: App {
         WindowGroup("LiveDeck Studio") {
             MainView()
                 .environmentObject(engine)
-                .frame(minWidth: 1100, minHeight: 640)
+                .frame(minWidth: 1280, minHeight: 760)
                 .onAppear { engine.start() }
         }
         .windowStyle(.titleBar)

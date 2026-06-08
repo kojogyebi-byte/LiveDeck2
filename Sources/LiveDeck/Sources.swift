@@ -13,6 +13,9 @@ class Source: NSObject, ObservableObject, Identifiable {
     @Published var name: String
     let kindLabel: String
 
+    @Published var muted = false
+    @Published var gain: Double = 1.0
+
     var latestBuffer: CVPixelBuffer?
     private var cachedImage: CGImage?
 
@@ -31,15 +34,21 @@ class Source: NSObject, ObservableObject, Identifiable {
         return cachedImage
     }
 
-    func draw(in ctx: CGContext, width: Int, height: Int) {
+    /// Cover-fit this source into an arbitrary rect (clipped).
+    func draw(in ctx: CGContext, rect: CGRect) {
         guard let img = currentImage() else { return }
         let iw = CGFloat(img.width), ih = CGFloat(img.height)
         guard iw > 0, ih > 0 else { return }
-        let scale = max(CGFloat(width) / iw, CGFloat(height) / ih)
+        let scale = max(rect.width / iw, rect.height / ih)
         let dw = iw * scale, dh = ih * scale
-        ctx.draw(img, in: CGRect(x: (CGFloat(width) - dw) / 2,
-                                 y: (CGFloat(height) - dh) / 2,
-                                 width: dw, height: dh))
+        ctx.saveGState()
+        ctx.clip(to: rect)
+        ctx.draw(img, in: CGRect(x: rect.midX - dw / 2, y: rect.midY - dh / 2, width: dw, height: dh))
+        ctx.restoreGState()
+    }
+
+    func draw(in ctx: CGContext, width: Int, height: Int) {
+        draw(in: ctx, rect: CGRect(x: 0, y: 0, width: width, height: height))
     }
 
     func stop() {}
@@ -181,9 +190,9 @@ final class ColorSource: Source {
         super.init(name: "Color", kindLabel: "COLOR")
     }
 
-    override func draw(in ctx: CGContext, width: Int, height: Int) {
+    override func draw(in ctx: CGContext, rect: CGRect) {
         ctx.setFillColor(color.cgColor)
-        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.fill(rect)
     }
 }
 
