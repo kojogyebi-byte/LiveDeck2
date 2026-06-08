@@ -16,6 +16,25 @@ class Source: NSObject, ObservableObject, Identifiable {
     @Published var muted = false
     @Published var gain: Double = 1.0
 
+    // Live input adjustments (vMix-style)
+    @Published var zoom: Double = 1.0        // 1 = fit
+    @Published var panX: Double = 0          // fraction of width
+    @Published var panY: Double = 0          // fraction of height
+    @Published var rotation: Double = 0      // degrees
+    @Published var cropL: Double = 0         // 0...0.45 each edge
+    @Published var cropR: Double = 0
+    @Published var cropT: Double = 0
+    @Published var cropB: Double = 0
+    @Published var brightness: Double = 0    // -1...1  (0 = none)
+    @Published var contrast: Double = 1.0    // 1 = none
+    @Published var saturation: Double = 1.0  // 1 = none
+
+    func resetAdjustments() {
+        zoom = 1; panX = 0; panY = 0; rotation = 0
+        cropL = 0; cropR = 0; cropT = 0; cropB = 0
+        brightness = 0; contrast = 1; saturation = 1
+    }
+
     var latestBuffer: CVPixelBuffer?
     private var cachedImage: CGImage?
 
@@ -34,16 +53,44 @@ class Source: NSObject, ObservableObject, Identifiable {
         return cachedImage
     }
 
-    /// Cover-fit this source into an arbitrary rect (clipped).
+    /// Color-corrected and cropped image (CI applied only when adjustments are non-default).
+    func processedImage() -> CGImage? {
+        guard let raw = currentImage() else { return nil }
+        let needColor = brightness != 0 || contrast != 1 || saturation != 1
+        let needCrop = cropL > 0 || cropR > 0 || cropT > 0 || cropB > 0
+        if !needColor && !needCrop { return raw }
+        var ci = CIImage(cgImage: raw)
+        if needCrop {
+            let e = ci.extent
+            let x = e.minX + cropL * e.width
+            let y = e.minY + cropB * e.height
+            let w = max(2, e.width * (1 - cropL - cropR))
+            let h = max(2, e.height * (1 - cropT - cropB))
+            ci = ci.cropped(to: CGRect(x: x, y: y, width: w, height: h))
+        }
+        if needColor, let f = CIFilter(name: "CIColorControls") {
+            f.setValue(ci, forKey: kCIInputImageKey)
+            f.setValue(brightness, forKey: "inputBrightness")
+            f.setValue(contrast, forKey: "inputContrast")
+            f.setValue(saturation, forKey: "inputSaturation")
+            if let out = f.outputImage { ci = out }
+        }
+        return sharedCIContext.createCGImage(ci, from: ci.extent) ?? raw
+    }
+
+    /// Cover-fit into a rect with live zoom / pan / rotate applied (clipped).
     func draw(in ctx: CGContext, rect: CGRect) {
-        guard let img = currentImage() else { return }
+        guard let img = processedImage() else { return }
         let iw = CGFloat(img.width), ih = CGFloat(img.height)
         guard iw > 0, ih > 0 else { return }
-        let scale = max(rect.width / iw, rect.height / ih)
-        let dw = iw * scale, dh = ih * scale
+        let baseScale = max(rect.width / iw, rect.height / ih) * CGFloat(max(0.05, zoom))
+        let dw = iw * baseScale, dh = ih * baseScale
         ctx.saveGState()
         ctx.clip(to: rect)
-        ctx.draw(img, in: CGRect(x: rect.midX - dw / 2, y: rect.midY - dh / 2, width: dw, height: dh))
+        ctx.translateBy(x: rect.midX + CGFloat(panX) * rect.width,
+                        y: rect.midY + CGFloat(panY) * rect.height)
+        if rotation != 0 { ctx.rotate(by: CGFloat(rotation) * .pi / 180) }
+        ctx.draw(img, in: CGRect(x: -dw / 2, y: -dh / 2, width: dw, height: dh))
         ctx.restoreGState()
     }
 

@@ -49,6 +49,15 @@ final class Layer: ObservableObject, Identifiable {
     @Published var style: Int = 0          // lower-third preset
     @Published var sourceRef: UUID?        // PiP source
 
+    // Overlay transform adjustments
+    @Published var opacity: Double = 1.0
+    @Published var offsetX: Double = 0     // fraction of width
+    @Published var offsetY: Double = 0     // fraction of height
+    @Published var scaleAdj: Double = 1.0
+    @Published var rotationAdj: Double = 0 // degrees
+
+    func resetTransform() { opacity = 1; offsetX = 0; offsetY = 0; scaleAdj = 1; rotationAdj = 0 }
+
     var remaining: Double = 300
     @Published var isRunning = false
     var lastTick: CFTimeInterval = 0
@@ -343,6 +352,9 @@ struct ShowLayer: Codable {
     var number1: Double, scoreA: Int, scoreB: Int
     var position: Int, use24h: Bool, style: Int
     var variants: [LayerVariant] = []
+    var opacity: Double = 1
+    var offsetX: Double = 0, offsetY: Double = 0
+    var scaleAdj: Double = 1, rotationAdj: Double = 0
 }
 
 struct ShowFile: Codable {
@@ -366,7 +378,9 @@ extension Layer {
                          aR: c.0, aG: c.1, aB: c.2, aA: c.3,
                          number1: number1, scoreA: scoreA, scoreB: scoreB,
                          position: position, use24h: use24h, style: style,
-                         variants: variants)
+                         variants: variants,
+                         opacity: opacity, offsetX: offsetX, offsetY: offsetY,
+                         scaleAdj: scaleAdj, rotationAdj: rotationAdj)
     }
 
     static func from(_ s: ShowLayer) -> Layer? {
@@ -377,6 +391,8 @@ extension Layer {
         l.number1 = s.number1; l.scoreA = s.scoreA; l.scoreB = s.scoreB
         l.position = s.position; l.use24h = s.use24h; l.style = s.style
         l.variants = s.variants
+        l.opacity = s.opacity; l.offsetX = s.offsetX; l.offsetY = s.offsetY
+        l.scaleAdj = s.scaleAdj; l.rotationAdj = s.rotationAdj
         if kind == .countdown { l.remaining = s.number1 * 60 }
         return l
     }

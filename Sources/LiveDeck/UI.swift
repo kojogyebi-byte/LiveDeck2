@@ -137,6 +137,8 @@ struct TransitionColumn: View {
             VStack(spacing: 4) {
                 Text("T-BAR").font(.system(size: 8, weight: .bold)).foregroundColor(.secondary)
                 Slider(value: Binding(get: { engine.tbar }, set: { engine.setTBar($0) }), in: 0...1)
+                Text("SPEED \(String(format: "%.1fs", engine.transitionDuration))").font(.system(size: 8, weight: .bold)).foregroundColor(.secondary)
+                Slider(value: $engine.transitionDuration, in: 0.2...2.0)
             }
             VStack(spacing: 1) {
                 Text(engine.clockText).font(.system(size: 14, weight: .bold, design: .monospaced)).foregroundColor(cProgram)
@@ -199,7 +201,7 @@ struct InputTile: View {
             .padding(.horizontal, 5).frame(height: 20).background(cBar)
             SourceThumb(source: source)
                 .frame(width: 176, height: 99).background(Color.black)
-                .onTapGesture { engine.setPreview(source.id) }
+                .onTapGesture { engine.setPreview(source.id); engine.selectedSourceID = source.id }
             HStack(spacing: 4) {
                 Button("PGM") { engine.setPreview(source.id); engine.cut() }
                     .font(.system(size: 9, weight: .bold)).buttonStyle(.plain)
@@ -254,12 +256,75 @@ struct RightPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $engine.rightTab) {
-                Text("Audio Mixer").tag(0); Text("Overlays").tag(1)
+                Text("Audio").tag(0); Text("Input").tag(1); Text("Overlays").tag(2)
             }.pickerStyle(.segmented).padding(8)
             Divider()
-            if engine.rightTab == 0 { AudioMixerPanel() } else { OverlaysPanel() }
+            if engine.rightTab == 0 { AudioMixerPanel() }
+            else if engine.rightTab == 1 { InputSettingsPanel() }
+            else { OverlaysPanel() }
         }
         .background(cPanel).overlay(Rectangle().frame(width: 1).foregroundColor(Color(white: 0.2)), alignment: .leading)
+    }
+}
+
+// Shared labelled slider for adjustments
+@ViewBuilder
+func adjSlider(_ label: String, _ value: Binding<Double>, _ range: ClosedRange<Double>) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+        HStack {
+            Text(label).font(.system(size: 10)).foregroundColor(.secondary)
+            Spacer()
+            Text(String(format: "%.2f", value.wrappedValue)).font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
+        }
+        Slider(value: value, in: range)
+    }
+}
+
+struct InputSettingsPanel: View {
+    @EnvironmentObject var engine: Engine
+    var body: some View {
+        ScrollView {
+            if let s = engine.sources.first(where: { $0.id == engine.selectedSourceID }) {
+                InputAdjust(source: s)
+            } else {
+                Text("Tap an input's thumbnail to adjust its zoom, pan, rotation, crop, colour and audio here.")
+                    .font(.system(size: 11)).foregroundColor(.secondary).padding(12)
+            }
+        }
+    }
+}
+
+struct InputAdjust: View {
+    @ObservedObject var source: Source
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(source.name.uppercased()).font(.system(size: 11, weight: .heavy)).kerning(1).foregroundColor(cPreview).lineLimit(1)
+                Spacer()
+                Button("Reset") { source.resetAdjustments() }.font(.system(size: 10))
+            }
+            Text("GEOMETRY").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
+            adjSlider("Zoom", $source.zoom, 0.2...4)
+            adjSlider("Pan X", $source.panX, -1...1)
+            adjSlider("Pan Y", $source.panY, -1...1)
+            adjSlider("Rotate", $source.rotation, -180...180)
+            Divider()
+            Text("CROP").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
+            adjSlider("Left", $source.cropL, 0...0.45)
+            adjSlider("Right", $source.cropR, 0...0.45)
+            adjSlider("Top", $source.cropT, 0...0.45)
+            adjSlider("Bottom", $source.cropB, 0...0.45)
+            Divider()
+            Text("COLOUR").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
+            adjSlider("Brightness", $source.brightness, -0.5...0.5)
+            adjSlider("Contrast", $source.contrast, 0...2)
+            adjSlider("Saturation", $source.saturation, 0...2)
+            Divider()
+            Text("AUDIO").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
+            adjSlider("Gain", $source.gain, 0...1.5)
+            Toggle("Mute", isOn: $source.muted).font(.system(size: 11))
+        }
+        .padding(12)
     }
 }
 
@@ -420,6 +485,7 @@ struct LayerInspector: View {
             }
             TextField("Layer name", text: $layer.name)
             VariantsView(layer: layer)
+            LayerTransformView(layer: layer)
             Divider()
             switch layer.kind {
             case .lowerThird:
@@ -508,6 +574,24 @@ struct VariantsView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct LayerTransformView: View {
+    @ObservedObject var layer: Layer
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("TRANSFORM").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
+                Spacer()
+                Button("Reset") { layer.resetTransform() }.font(.system(size: 10))
+            }
+            adjSlider("Opacity", $layer.opacity, 0...1)
+            adjSlider("Pos X", $layer.offsetX, -0.5...0.5)
+            adjSlider("Pos Y", $layer.offsetY, -0.5...0.5)
+            adjSlider("Scale", $layer.scaleAdj, 0.2...3)
+            adjSlider("Rotate", $layer.rotationAdj, -180...180)
         }
     }
 }

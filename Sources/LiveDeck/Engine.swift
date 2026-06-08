@@ -17,6 +17,7 @@ final class Engine: ObservableObject {
     @Published var sources: [Source] = []
     @Published var layers: [Layer] = []
     @Published var selectedLayerID: UUID?
+    @Published var selectedSourceID: UUID?
 
     // vMix-style Preview / Program buses
     @Published var previewID: UUID?
@@ -150,7 +151,7 @@ final class Engine: ObservableObject {
 
     // MARK: layers
 
-    func addLayer(_ kind: Layer.Kind) { let l = Layer(kind: kind); layers.insert(l, at: 0); selectedLayerID = l.id; rightTab = 1 }
+    func addLayer(_ kind: Layer.Kind) { let l = Layer(kind: kind); layers.insert(l, at: 0); selectedLayerID = l.id; rightTab = 2 }
     func removeLayer(_ id: UUID) { layers.removeAll { $0.id == id }; if selectedLayerID == id { selectedLayerID = nil } }
     func moveLayer(_ id: UUID, by delta: Int) {
         guard let i = layers.firstIndex(where: { $0.id == id }) else { return }
@@ -201,8 +202,22 @@ final class Engine: ObservableObject {
             layer.liveT += (layer.isLive ? 1 : -1) * dt / 0.45
             layer.liveT = max(0, min(1, layer.liveT))
             if layer.liveT > 0 {
+                ctx.saveGState()
+                // transform: offset, then scale+rotate about centre
+                ctx.translateBy(x: CGFloat(layer.offsetX) * CGFloat(width),
+                                y: CGFloat(layer.offsetY) * CGFloat(height))
+                if layer.scaleAdj != 1 || layer.rotationAdj != 0 {
+                    ctx.translateBy(x: CGFloat(width) / 2, y: CGFloat(height) / 2)
+                    if layer.rotationAdj != 0 { ctx.rotate(by: CGFloat(layer.rotationAdj) * .pi / 180) }
+                    ctx.scaleBy(x: CGFloat(layer.scaleAdj), y: CGFloat(layer.scaleAdj))
+                    ctx.translateBy(x: -CGFloat(width) / 2, y: -CGFloat(height) / 2)
+                }
+                let useGroup = layer.opacity < 0.999
+                if useGroup { ctx.setAlpha(CGFloat(layer.opacity)); ctx.beginTransparencyLayer(auxiliaryInfo: nil) }
                 LayerRenderer.render(layer, in: ctx, width: width, height: height, time: now,
                                      sourceImage: { [weak self] id in self?.sources.first(where: { $0.id == id })?.currentImage() })
+                if useGroup { ctx.endTransparencyLayer() }
+                ctx.restoreGState()
             }
         }
         if ftbT > 0 { ctx.setFillColor(NSColor.black.withAlphaComponent(CGFloat(ftbT)).cgColor); ctx.fill(full) }
