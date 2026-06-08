@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>LiveDeck</string>
+    <key>CFBundleDisplayName</key>
+    <string>LiveDeck Studio</string>
+    <key>CFBundleExecutable</key>
+    <string>LiveDeck</string>
+    <key>CFBundleIdentifier</key>
+    <string>org.livedeck.studio</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSCameraUsageDescription</key>
+    <string>LiveDeck needs camera access to use cameras as live video sources.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>LiveDeck needs microphone access to record audio with your program output.</string>
+</dict>
+</plist>
