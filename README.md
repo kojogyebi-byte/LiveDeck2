@@ -1,4 +1,4 @@
-# LiveDeck Studio (macOS) — v2.1  (vMix-style switcher + live adjustments)
+# LiveDeck Studio (macOS) — v2.2  (assignable inputs + external devices)
 
 A native Mac live production switcher: Preview/Program buses with a transition T-bar, an input bus with live thumbnails, an audio mixer with VU meters, animated overlay graphics with variants, multiview, and MP4 recording. Built with Swift, SwiftUI, AVFoundation and ScreenCaptureKit. Requires macOS 13 Ventura or newer.
 
@@ -17,6 +17,12 @@ A native Mac live production switcher: Preview/Program buses with a transition T
 - **Overlay channels.** Your layers act as overlays; the status-bar buttons 1–4 toggle the first four on air, and the Overlays tab holds the full layer list, inspector and variants.
 - **Status bar & top bar.** Resolution/FPS readout, clock + on-air timer, Record/Stream/Snapshot/Multiview, and a vMix-style top bar (Open/Save, Fullscreen output, STREAM, REC).
 
+## v2.2 — flexible inputs & external video devices
+
+- **Five blank input slots** are created on launch. Click a slot's **Select input** button to assign it to a camera/device, screen capture, video file, image or colour — just like vMix's input list. **Add Input** (bus header) also has a **Blank Input** option to add more empty slots.
+- **External video devices.** The device list now enumerates everything AVFoundation can see: built-in cameras, USB webcams, HDMI/SDI capture cards, and — when their macOS drivers are installed — **Blackmagic DeckLink** and **AJA** inputs, plus virtual cameras (e.g. OBS). This uses the CoreMediaIO opt-in so DAL/hardware devices appear without needing each vendor's SDK. Use **Refresh devices** if you plug something in while running.
+- **More video formats.** The file picker now accepts MOV, MP4, M4V, MPEG-4, MPEG/TS, AVI, WMV and MKV containers. Note: playback depends on macOS having a codec for the file — Apple natively decodes H.264/HEVC/ProRes in MOV/MP4/M4V (and MPEG-TS); AVI/WMV/MKV play only if you have the matching codecs installed, otherwise the input stays black.
+
 ## v2.1 — live adjustment controls on every element
 
 - **Per-input adjustments (Input tab).** Tap any input's thumbnail, then tune it live: **Zoom, Pan X/Y, Rotate, Crop (each edge), Brightness, Contrast, Saturation**, plus audio **Gain** and **Mute**. A **Reset** button restores defaults. Mirrors vMix's "Zoom, Pan, Rotate, Crop" and real-time colour correction.
@@ -25,6 +31,6 @@ A native Mac live production switcher: Preview/Program buses with a transition T
 
 ## Honest scope — what's NOT included
 
-These vMix features need licensed SDKs, Windows-only components, or system extensions and are not in this app: **NDI, virtual camera, vMix Call, Zoom integration, SRT, AJA/Blackmagic/Bluefish hardware output, instant replay, DVD, web-browser input, and the GT title designer.** Direct RTMP streaming also needs a relay and is not wired (capture the Program window in OBS/YouTube to stream for now).
+These vMix features need licensed SDKs, Windows-only components, or system extensions and are not in this app: **NDI, virtual camera, vMix Call, Zoom integration, SRT, AJA/Blackmagic hardware *output* (input via drivers now works), instant replay, DVD, web-browser input, and the GT title designer.** Direct RTMP streaming also needs a relay and is not wired (capture the Program window in OBS/YouTube to stream for now).
 
 Audio: meters are real on the Master/Recording/program-input strips; faders and mutes are stored per input. Recorded audio is the single selected input device (route your mixer's USB feed there for a full board mix). True simultaneous multi-source audio mixing into the recording is the next milestone.

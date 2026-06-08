@@ -181,38 +181,84 @@ struct InputBus: View {
     }
 }
 
+let videoFileTypes = ["public.movie", "public.video", "public.audiovisual-content",
+                      "com.apple.quicktime-movie", "public.mpeg-4", "public.avi",
+                      "public.mpeg", "public.mpeg-2-transport-stream",
+                      "org.matroska.mkv", "com.microsoft.windows-media-wmv"]
+
+struct InputAssignMenu<Label: View>: View {
+    @EnvironmentObject var engine: Engine
+    var slotID: UUID
+    @ViewBuilder var label: () -> Label
+    @State private var devices: [AVCaptureDevice] = []
+    var body: some View {
+        Menu {
+            Menu("Cameras & Capture Devices") {
+                ForEach(devices, id: \.uniqueID) { d in
+                    Button(d.localizedName) { engine.replaceSource(slotID, with: CameraSource(device: d)) }
+                }
+                if devices.isEmpty { Text("No devices found") }
+                Divider()
+                Button("Refresh devices") { devices = VideoDevices.all() }
+            }
+            Button("Screen Capture") { engine.replaceSource(slotID, with: ScreenSource()) }
+            Button("Video File…") { pickFile(types: videoFileTypes) { engine.replaceSource(slotID, with: FileSource(url: $0)) } }
+            Button("Image…") { pickFile(types: ["public.image"]) { engine.replaceSource(slotID, with: ImageSource(url: $0)) } }
+            Button("Colour") { engine.replaceSource(slotID, with: ColorSource()) }
+        } label: { label() }
+        .onAppear { if devices.isEmpty { devices = VideoDevices.all() } }
+    }
+}
+
 struct InputTile: View {
     @EnvironmentObject var engine: Engine
     var index: Int
     @ObservedObject var source: Source
     var isProgram: Bool { engine.programID == source.id }
     var isPreview: Bool { engine.previewID == source.id }
-    var border: Color { isProgram ? .red : isPreview ? cProgram : Color(white: 0.25) }
+    var border: Color { source.isPlaceholder ? Color(white: 0.22) : (isProgram ? .red : isPreview ? cProgram : Color(white: 0.25)) }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
                 Text("\(index)").font(.system(size: 9, weight: .heavy))
                     .frame(width: 16, height: 16).background(border).cornerRadius(2)
-                Text(source.name).font(.system(size: 10)).lineLimit(1)
+                Text(source.isPlaceholder ? "Empty" : source.name).font(.system(size: 10))
+                    .foregroundColor(source.isPlaceholder ? .secondary : .primary).lineLimit(1)
                 Spacer()
                 Button { engine.removeSource(source.id) } label: { Image(systemName: "xmark").font(.system(size: 8)) }
                     .buttonStyle(.plain).foregroundColor(.secondary)
             }
             .padding(.horizontal, 5).frame(height: 20).background(cBar)
-            SourceThumb(source: source)
-                .frame(width: 176, height: 99).background(Color.black)
-                .onTapGesture { engine.setPreview(source.id); engine.selectedSourceID = source.id }
-            HStack(spacing: 4) {
-                Button("PGM") { engine.setPreview(source.id); engine.cut() }
-                    .font(.system(size: 9, weight: .bold)).buttonStyle(.plain)
-                    .padding(.horizontal, 8).padding(.vertical, 3).background(Color(white: 0.18)).cornerRadius(3)
-                Spacer()
-                Button { source.muted.toggle() } label: {
-                    Image(systemName: source.muted ? "speaker.slash.fill" : "speaker.wave.2.fill").font(.system(size: 9))
-                        .foregroundColor(source.muted ? .red : cProgram)
-                }.buttonStyle(.plain)
+
+            if source.isPlaceholder {
+                InputAssignMenu(slotID: source.id) {
+                    VStack(spacing: 6) {
+                        Image(systemName: "plus.circle").font(.system(size: 22)).foregroundColor(Color(white: 0.4))
+                        Text("Select input").font(.system(size: 10)).foregroundColor(.secondary)
+                    }
+                    .frame(width: 176, height: 99).background(Color(white: 0.10))
+                    .overlay(RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4])).foregroundColor(Color(white: 0.3)))
+                }
+                .menuStyle(.borderlessButton)
+                Color.clear.frame(height: 22)
+            } else {
+                SourceThumb(source: source)
+                    .frame(width: 176, height: 99).background(Color.black)
+                    .onTapGesture { engine.setPreview(source.id); engine.selectedSourceID = source.id }
+                HStack(spacing: 4) {
+                    Button("PGM") { engine.setPreview(source.id); engine.cut() }
+                        .font(.system(size: 9, weight: .bold)).buttonStyle(.plain)
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(Color(white: 0.18)).cornerRadius(3)
+                    Spacer()
+                    Button { source.muted.toggle() } label: {
+                        Image(systemName: source.muted ? "speaker.slash.fill" : "speaker.wave.2.fill").font(.system(size: 9))
+                            .foregroundColor(source.muted ? .red : cProgram)
+                    }.buttonStyle(.plain)
+                }
+                .padding(.horizontal, 5).frame(height: 22).background(cBar)
             }
-            .padding(.horizontal, 5).frame(height: 22).background(cBar)
         }
         .overlay(Rectangle().stroke(border, lineWidth: 2))
     }
@@ -226,26 +272,27 @@ struct SourceThumb: NSViewRepresentable {
 
 struct AddInputMenu: View {
     @EnvironmentObject var engine: Engine
-    @State private var cameras: [AVCaptureDevice] = []
+    @State private var devices: [AVCaptureDevice] = []
     var body: some View {
         Menu {
-            Menu("Camera") {
-                ForEach(cameras, id: \.uniqueID) { d in Button(d.localizedName) { engine.addCamera(d) } }
-                if cameras.isEmpty { Text("No cameras found") }
+            Menu("Cameras & Capture Devices") {
+                ForEach(devices, id: \.uniqueID) { d in Button(d.localizedName) { engine.addCamera(d) } }
+                if devices.isEmpty { Text("No devices found") }
+                Divider()
+                Button("Refresh devices") { devices = VideoDevices.all() }
             }
-            Button("Screen") { engine.addScreen() }
-            Button("Video File…") { pickFile(types: ["public.movie"]) { engine.addFile(url: $0) } }
+            Button("Screen Capture") { engine.addScreen() }
+            Button("Video File…") { pickFile(types: videoFileTypes) { engine.addFile(url: $0) } }
             Button("Image…") { pickFile(types: ["public.image"]) { engine.addImage(url: $0) } }
             Button("Colour") { engine.addColor() }
+            Divider()
+            Button("Blank Input") { engine.addBlankInput() }
         } label: {
             Text("Add Input").font(.system(size: 10, weight: .bold))
                 .padding(.horizontal, 8).padding(.vertical, 3).background(cProgram).foregroundColor(.white).cornerRadius(3)
         }
         .menuStyle(.borderlessButton).fixedSize()
-        .onAppear {
-            cameras = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .externalUnknown],
-                                                       mediaType: .video, position: .unspecified).devices
-        }
+        .onAppear { if devices.isEmpty { devices = VideoDevices.all() } }
     }
 }
 
@@ -336,7 +383,7 @@ struct AudioMixerPanel: View {
                 MasterStrip(label: "MASTER", level: engine.audioLevel)
                 MasterStrip(label: "RECORDING", level: engine.isRecording ? engine.audioLevel : 0)
                 Divider()
-                ForEach(engine.sources) { s in
+                ForEach(engine.sources.filter { !$0.isPlaceholder }) { s in
                     ChannelStrip(source: s, level: engine.programID == s.id ? engine.audioLevel : 0)
                 }
                 Text("Faders & mutes are stored per input. Recorded audio is the selected input device; full multi-source mixing is the next milestone.")

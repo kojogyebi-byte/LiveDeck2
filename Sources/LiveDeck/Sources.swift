@@ -2,9 +2,33 @@ import Foundation
 import AVFoundation
 import ScreenCaptureKit
 import CoreImage
+import CoreMediaIO
 import AppKit
 
 let sharedCIContext = CIContext()
+
+// MARK: - Video device discovery (webcams, capture cards, DeckLink, AJA, virtual cams)
+
+enum VideoDevices {
+    /// Opt in to CoreMediaIO DAL plug-ins so third-party hardware (Blackmagic DeckLink,
+    /// AJA, OBS virtual camera, etc.) is visible through AVFoundation. Requires the
+    /// vendor's macOS drivers (e.g. Blackmagic Desktop Video) to be installed.
+    static func enableExternalDevices() {
+        var address = CMIOObjectPropertyAddress(
+            mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyAllowScreenCaptureDevices),
+            mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+            mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+        var allow: UInt32 = 1
+        CMIOObjectSetPropertyData(CMIOObjectID(kCMIOObjectSystemObject), &address, 0, nil,
+                                  UInt32(MemoryLayout<UInt32>.size), &allow)
+    }
+
+    static func all() -> [AVCaptureDevice] {
+        enableExternalDevices()
+        let types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .externalUnknown]
+        return AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .unspecified).devices
+    }
+}
 
 // MARK: - Base source
 
@@ -12,6 +36,7 @@ class Source: NSObject, ObservableObject, Identifiable {
     let id = UUID()
     @Published var name: String
     let kindLabel: String
+    var isPlaceholder: Bool { false }
 
     @Published var muted = false
     @Published var gain: Double = 1.0
@@ -240,6 +265,17 @@ final class ColorSource: Source {
     override func draw(in ctx: CGContext, rect: CGRect) {
         ctx.setFillColor(color.cgColor)
         ctx.fill(rect)
+    }
+}
+
+// MARK: - Empty placeholder slot
+
+final class EmptySource: Source {
+    override var isPlaceholder: Bool { true }
+    init() { super.init(name: "Empty", kindLabel: "EMPTY") }
+    override func currentImage() -> CGImage? { nil }
+    override func draw(in ctx: CGContext, rect: CGRect) {
+        ctx.setFillColor(NSColor(white: 0.08, alpha: 1).cgColor); ctx.fill(rect)
     }
 }
 

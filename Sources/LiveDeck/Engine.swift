@@ -83,7 +83,24 @@ final class Engine: ObservableObject {
         }
         audioCapture.onLevel = { [weak self] lvl in self?.audioLevel = lvl }
         audioCapture.start(deviceID: selectedAudioDeviceID)
+        if sources.isEmpty { for _ in 0..<5 { sources.append(EmptySource()) } }
     }
+
+    /// Replace a slot (e.g. a blank placeholder) with a real source in place.
+    func replaceSource(_ oldID: UUID, with new: Source) {
+        guard let idx = sources.firstIndex(where: { $0.id == oldID }) else { return }
+        sources[idx].stop()
+        sources[idx] = new
+        if programID == oldID { programID = new.id }
+        if previewID == oldID { previewID = new.id }
+        if transFrom == oldID { transFrom = new.id }
+        if selectedSourceID == oldID { selectedSourceID = new.id }
+        if programID == nil { programID = new.id }
+        else if previewID == nil { previewID = new.id }
+        selectedSourceID = new.id
+    }
+
+    func addBlankInput() { sources.append(EmptySource()) }
 
     func setAudioDevice(_ id: String?) { selectedAudioDeviceID = id; audioCapture.start(deviceID: id) }
     func addConsumer(_ v: FrameNSView) { consumers.add(v) }
