@@ -1,0 +1,33 @@
+name: Build LiveDeck for macOS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Build (universal: Apple Silicon + Intel)"
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Assemble .app bundle
+        run: |
+          APP="LiveDeck.app"
+          BIN=".build/apple/Products/Release/LiveDeck"
+          if [ ! -f "$BIN" ]; then BIN=$(find .build -name LiveDeck -type f -path "*Release*" | head -1); fi
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp "$BIN" "$APP/Contents/MacOS/LiveDeck"
+          cp Resources/Info.plist "$APP/Contents/Info.plist"
+          /usr/bin/codesign --force --deep --sign - "$APP"
+          ditto -c -k --keepParent "$APP" LiveDeck-macOS.zip
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiveDeck-macOS
+          path: LiveDeck-macOS.zip
