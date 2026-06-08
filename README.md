@@ -1,4 +1,4 @@
-# LiveDeck Studio (macOS) — v2.2  (assignable inputs + external devices)
+# LiveDeck Studio (macOS) — v2.3  (loop, mixer + effects, resizable UI, stream settings)
 
 A native Mac live production switcher: Preview/Program buses with a transition T-bar, an input bus with live thumbnails, an audio mixer with VU meters, animated overlay graphics with variants, multiview, and MP4 recording. Built with Swift, SwiftUI, AVFoundation and ScreenCaptureKit. Requires macOS 13 Ventura or newer.
 
@@ -16,6 +16,17 @@ A native Mac live production switcher: Preview/Program buses with a transition T
 - **Audio mixer panel.** Master and Recording strips with live VU meters, plus a channel strip per input (meter, fader, M-mute), mirroring vMix's mixer.
 - **Overlay channels.** Your layers act as overlays; the status-bar buttons 1–4 toggle the first four on air, and the Overlays tab holds the full layer list, inspector and variants.
 - **Status bar & top bar.** Resolution/FPS readout, clock + on-air timer, Record/Stream/Snapshot/Multiview, and a vMix-style top bar (Open/Save, Fullscreen output, STREAM, REC).
+
+## v2.3 — playback, mixing, resizable UI & streaming setup
+
+- **Loop & playback control.** Video file inputs have a **Loop** toggle plus **Pause/Play** and **Restart** in the Input tab.
+- **Editable input names.** Rename any input in the Input tab; the name updates everywhere (bus, monitors, mixer).
+- **Per-input audio metering.** Assign an audio device to each input (Input tab → Audio) and its channel strip shows a **live VU meter**. Strips have fader, **Mute** and **Solo**.
+- **Audio effects per input.** An **EQ** (low/mid/high), **Compressor** (threshold/ratio) and **Gate** (threshold) editor on every input and in the mixer's FX popover. Parameters are stored per input.
+- **Resizable sections.** The monitors area, input bus and right panel are now separated by draggable dividers — size each section to taste.
+- **Stream settings.** The **STREAM** button opens a destinations manager: add multiple targets, pick a **platform** (YouTube / Facebook Live / Twitch / Custom) which auto-fills the ingest URL, choose a **protocol** (RTMP / RTMPS / SRT), and enter your server URL + stream key. Destinations are saved between launches.
+
+> Honest note on audio & streaming: per-input meters are real and effect/fader/mute settings are stored, but the recording still captures the master input device — summing every input through its effects into the recording is the remaining audio-engine milestone. Likewise, stream destinations are saved and the full ingest URL is composed for you, but going live needs a streaming encoder that isn't bundled yet (capture the Program window in OBS / YouTube to broadcast today).
 
 ## v2.2 — flexible inputs & external video devices
 

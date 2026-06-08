@@ -15,24 +15,26 @@ private let pipNoneTag = UUID()
 
 struct MainView: View {
     @EnvironmentObject var engine: Engine
+    @State private var showStream = false
     var body: some View {
         VStack(spacing: 0) {
-            TopBar()
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
+            TopBar(showStream: $showStream)
+            HSplitView {
+                VSplitView {
                     HStack(spacing: 6) {
                         MonitorPane(title: previewName, accent: cPreview, isProgram: false)
                         TransitionColumn()
                         MonitorPane(title: programName, accent: engine.isRecording ? .red : cProgram, isProgram: true)
                     }
                     .padding(6).frame(maxHeight: .infinity)
-                    InputBus().frame(height: 156)
+                    InputBus().frame(minHeight: 130, idealHeight: 156)
                 }
-                RightPanel().frame(width: 300)
+                RightPanel().frame(minWidth: 240, idealWidth: 300, maxWidth: 480)
             }
             StatusBar()
         }
         .background(cBG).preferredColorScheme(.dark)
+        .sheet(isPresented: $showStream) { StreamSettingsView() }
     }
     var previewName: String { engine.sources.first { $0.id == engine.previewID }?.name ?? "Preview" }
     var programName: String { engine.sources.first { $0.id == engine.programID }?.name ?? "Program" }
@@ -42,6 +44,7 @@ struct MainView: View {
 
 struct TopBar: View {
     @EnvironmentObject var engine: Engine
+    @Binding var showStream: Bool
     var body: some View {
         HStack(spacing: 8) {
             Text("LIVE").font(.system(size: 16, weight: .heavy)) + Text("DECK").font(.system(size: 16, weight: .heavy)).foregroundColor(cPreview)
@@ -50,7 +53,7 @@ struct TopBar: View {
             TBtn("Save") { engine.saveShow() }
             Spacer()
             TBtn("Fullscreen", tint: cProgram) { engine.openOutputWindow() }
-            TBtn("STREAM", tint: .red).disabled(true).opacity(0.5)
+            TBtn("STREAM", tint: .red) { showStream = true }
             TBtn(engine.isRecording ? "● REC" : "REC", tint: .red, filled: engine.isRecording) { engine.toggleRecording() }
             Spacer()
             Text("\(engine.width)×\(engine.height)").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
@@ -343,13 +346,19 @@ struct InputSettingsPanel: View {
 
 struct InputAdjust: View {
     @ObservedObject var source: Source
+    @State private var audioDevices: [AudioDeviceInfo] = []
+    @State private var showFX = false
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(source.name.uppercased()).font(.system(size: 11, weight: .heavy)).kerning(1).foregroundColor(cPreview).lineLimit(1)
+                Text("INPUT NAME").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
                 Spacer()
                 Button("Reset") { source.resetAdjustments() }.font(.system(size: 10))
             }
+            TextField("Name", text: $source.name)
+
+            if let f = source as? FileSource { FileControls(file: f) }
+
             Text("GEOMETRY").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
             adjSlider("Zoom", $source.zoom, 0.2...4)
             adjSlider("Pan X", $source.panX, -1...1)
@@ -368,10 +377,52 @@ struct InputAdjust: View {
             adjSlider("Saturation", $source.saturation, 0...2)
             Divider()
             Text("AUDIO").font(.system(size: 9, weight: .heavy)).kerning(1.5).foregroundColor(.secondary)
+            Picker("Audio device", selection: Binding(
+                get: { source.audioDeviceID ?? "" },
+                set: { source.audioDeviceID = $0.isEmpty ? nil : $0 })) {
+                Text("None").tag("")
+                ForEach(audioDevices) { d in Text(d.name).tag(d.id) }
+            }
+            AudioMeter(level: source.muted ? 0 : source.level).frame(height: 10)
             adjSlider("Gain", $source.gain, 0...1.5)
             Toggle("Mute", isOn: $source.muted).font(.system(size: 11))
+            Button(showFX ? "Hide Effects" : "Audio Effects (EQ · Comp · Gate)") { showFX.toggle() }
+                .font(.system(size: 11))
+            if showFX { AudioEffects(source: source) }
         }
         .padding(12)
+        .onAppear { audioDevices = AudioCapture.availableDevices() }
+    }
+}
+
+struct FileControls: View {
+    @ObservedObject var file: FileSource
+    var body: some View {
+        HStack(spacing: 8) {
+            Toggle("Loop", isOn: $file.loop).font(.system(size: 11))
+            Spacer()
+            Button(file.paused ? "Play" : "Pause") { file.togglePlay() }.font(.system(size: 10))
+            Button("Restart") { file.restart() }.font(.system(size: 10))
+        }
+    }
+}
+
+struct AudioEffects: View {
+    @ObservedObject var source: Source
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Enable effects", isOn: $source.fxEnabled).font(.system(size: 11))
+            Text("EQUALISER (dB)").font(.system(size: 9, weight: .heavy)).foregroundColor(.secondary)
+            adjSlider("Low", $source.eqLow, -24...24)
+            adjSlider("Mid", $source.eqMid, -24...24)
+            adjSlider("High", $source.eqHigh, -24...24)
+            Text("COMPRESSOR").font(.system(size: 9, weight: .heavy)).foregroundColor(.secondary)
+            adjSlider("Threshold", $source.compThreshold, -40...0)
+            adjSlider("Ratio", $source.compRatio, 1...20)
+            Text("GATE").font(.system(size: 9, weight: .heavy)).foregroundColor(.secondary)
+            adjSlider("Threshold", $source.gateThreshold, -80...0)
+        }
+        .padding(8).background(Color(white: 0.10)).cornerRadius(6)
     }
 }
 
@@ -384,9 +435,9 @@ struct AudioMixerPanel: View {
                 MasterStrip(label: "RECORDING", level: engine.isRecording ? engine.audioLevel : 0)
                 Divider()
                 ForEach(engine.sources.filter { !$0.isPlaceholder }) { s in
-                    ChannelStrip(source: s, level: engine.programID == s.id ? engine.audioLevel : 0)
+                    ChannelStrip(source: s)
                 }
-                Text("Faders & mutes are stored per input. Recorded audio is the selected input device; full multi-source mixing is the next milestone.")
+                Text("Assign an audio device to each input (Input tab) for live metering. Faders, mutes and effect settings are stored per input. Recorded audio is the master input device; summing all inputs with their effects into the recording is the next milestone.")
                     .font(.system(size: 9)).foregroundColor(.secondary)
             }.padding(10)
         }
@@ -405,20 +456,33 @@ struct MasterStrip: View {
 
 struct ChannelStrip: View {
     @ObservedObject var source: Source
-    var level: Float
+    @State private var showFX = false
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(source.name).font(.system(size: 10)).lineLimit(1)
                 Spacer()
+                Button { source.solo.toggle() } label: {
+                    Text("S").font(.system(size: 9, weight: .heavy)).frame(width: 18, height: 16)
+                        .background(source.solo ? cProgram : Color(white: 0.2)).cornerRadius(3)
+                }.buttonStyle(.plain)
                 Button { source.muted.toggle() } label: {
-                    Text("M").font(.system(size: 9, weight: .heavy))
-                        .frame(width: 18, height: 16)
+                    Text("M").font(.system(size: 9, weight: .heavy)).frame(width: 18, height: 16)
                         .background(source.muted ? Color.red : Color(white: 0.2)).cornerRadius(3)
                 }.buttonStyle(.plain)
             }
-            AudioMeter(level: source.muted ? 0 : level).frame(height: 10)
+            AudioMeter(level: source.muted ? 0 : source.level).frame(height: 10)
             Slider(value: $source.gain, in: 0...1.5)
+            HStack {
+                if source.audioDeviceID == nil {
+                    Text("no audio device").font(.system(size: 8)).foregroundColor(.secondary)
+                } else if source.fxEnabled {
+                    Text("FX ON").font(.system(size: 8, weight: .bold)).foregroundColor(cProgram)
+                }
+                Spacer()
+                Button("FX") { showFX.toggle() }.font(.system(size: 9))
+                    .popover(isPresented: $showFX) { AudioEffects(source: source).frame(width: 240).padding(10) }
+            }
         }
         .padding(6).background(Color(white: 0.11)).cornerRadius(5)
     }
@@ -640,6 +704,69 @@ struct LayerTransformView: View {
             adjSlider("Scale", $layer.scaleAdj, 0.2...3)
             adjSlider("Rotate", $layer.rotationAdj, -180...180)
         }
+    }
+}
+
+// MARK: - Stream settings
+
+struct StreamSettingsView: View {
+    @EnvironmentObject var engine: Engine
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("STREAM DESTINATIONS").font(.system(size: 13, weight: .heavy)).kerning(1)
+                Spacer()
+                Button("Add Destination") { engine.addStreamDestination() }
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            if engine.streamDestinations.isEmpty {
+                Text("No destinations yet. Add one and choose a platform (YouTube, Facebook Live, Twitch) or a custom RTMP/RTMPS/SRT server.")
+                    .font(.system(size: 11)).foregroundColor(.secondary)
+            }
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach($engine.streamDestinations) { $d in StreamRow(dest: $d) }
+                }
+            }
+            Text("LiveDeck stores these destinations (RTMP/RTMPS/SRT URL + key). Actually going live needs a streaming encoder, which isn't bundled yet — for now capture the Program window in OBS or YouTube's browser encoder. These saved settings are ready for when the encoder lands.")
+                .font(.system(size: 10)).foregroundColor(.secondary)
+        }
+        .padding(16).frame(width: 540, height: 480)
+        .preferredColorScheme(.dark)
+    }
+}
+
+struct StreamRow: View {
+    @EnvironmentObject var engine: Engine
+    @Binding var dest: StreamDestination
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Toggle("", isOn: $dest.enabled).labelsHidden()
+                TextField("Name", text: $dest.name)
+                Button { engine.removeStreamDestination(dest.id) } label: { Image(systemName: "trash") }
+                    .buttonStyle(.borderless).foregroundColor(.red)
+            }
+            HStack {
+                Picker("Platform", selection: $dest.platform) {
+                    ForEach(StreamDestination.platforms, id: \.self) { Text($0).tag($0) }
+                }
+                .onChange(of: dest.platform) { newValue in
+                    let p = StreamDestination.preset(for: newValue)
+                    dest.proto = p.proto
+                    if !p.url.isEmpty { dest.url = p.url }
+                }
+                Picker("Protocol", selection: $dest.proto) {
+                    ForEach(StreamDestination.protocols, id: \.self) { Text($0).tag($0) }
+                }
+            }
+            TextField("Server URL", text: $dest.url)
+            SecureField("Stream key", text: $dest.key)
+            Text(dest.composedURL).font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
+        }
+        .textFieldStyle(.roundedBorder)
+        .padding(10).background(Color(white: 0.12)).cornerRadius(6)
     }
 }
 

@@ -40,6 +40,21 @@ class Source: NSObject, ObservableObject, Identifiable {
 
     @Published var muted = false
     @Published var gain: Double = 1.0
+    @Published var solo = false
+
+    // Per-input audio device + live level
+    @Published var level: Float = 0
+    @Published var audioDeviceID: String? { didSet { meter.start(deviceID: audioDeviceID) } }
+    let meter = InputAudioMeter()
+
+    // Per-input audio effects (parameters; metering is live)
+    @Published var fxEnabled = false
+    @Published var eqLow: Double = 0      // dB  -24...24
+    @Published var eqMid: Double = 0
+    @Published var eqHigh: Double = 0
+    @Published var compThreshold: Double = -20  // dB
+    @Published var compRatio: Double = 2         // :1
+    @Published var gateThreshold: Double = -60   // dB
 
     // Live input adjustments (vMix-style)
     @Published var zoom: Double = 1.0        // 1 = fit
@@ -67,6 +82,7 @@ class Source: NSObject, ObservableObject, Identifiable {
         self.name = name
         self.kindLabel = kindLabel
         super.init()
+        meter.onLevel = { [weak self] lvl in self?.level = lvl }
     }
 
     func currentImage() -> CGImage? {
@@ -204,6 +220,8 @@ final class FileSource: Source {
     private let player: AVPlayer
     private let output: AVPlayerItemVideoOutput
     private var loopObserver: NSObjectProtocol?
+    @Published var loop = true
+    @Published var paused = false
 
     init(url: URL) {
         let item = AVPlayerItem(url: url)
@@ -216,11 +234,20 @@ final class FileSource: Source {
         loopObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
         ) { [weak self] _ in
-            self?.player.seek(to: .zero)
-            self?.player.play()
+            guard let self else { return }
+            if self.loop && !self.paused { self.player.seek(to: .zero); self.player.play() }
         }
         player.play()
     }
+
+    func togglePlay() {
+        paused.toggle()
+        if paused { player.pause() } else {
+            if player.currentItem?.currentTime() == player.currentItem?.duration { player.seek(to: .zero) }
+            player.play()
+        }
+    }
+    func restart() { player.seek(to: .zero); paused = false; player.play() }
 
     override func currentImage() -> CGImage? {
         let time = player.currentTime()
@@ -276,6 +303,39 @@ final class EmptySource: Source {
     override func currentImage() -> CGImage? { nil }
     override func draw(in ctx: CGContext, rect: CGRect) {
         ctx.setFillColor(NSColor(white: 0.08, alpha: 1).cgColor); ctx.fill(rect)
+    }
+}
+
+// MARK: - Per-input audio meter
+
+final class InputAudioMeter: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
+    private var session: AVCaptureSession?
+    private let queue = DispatchQueue(label: "input.audio.meter")
+    var onLevel: ((Float) -> Void)?
+    private var smoothed: Float = 0
+
+    func start(deviceID: String?) {
+        stop()
+        guard let id = deviceID, let dev = AVCaptureDevice(uniqueID: id),
+              let input = try? AVCaptureDeviceInput(device: dev) else { onLevel?(0); return }
+        let s = AVCaptureSession()
+        if s.canAddInput(input) { s.addInput(input) }
+        let out = AVCaptureAudioDataOutput()
+        out.setSampleBufferDelegate(self, queue: queue)
+        if s.canAddOutput(out) { s.addOutput(out) }
+        queue.async { s.startRunning() }
+        session = s
+    }
+
+    func stop() { session?.stopRunning(); session = nil; DispatchQueue.main.async { self.onLevel?(0) } }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if let ch = connection.audioChannels.first {
+            let lin = Float(pow(10.0, Double(ch.averagePowerLevel) / 20.0))
+            smoothed = max(lin, smoothed * 0.82)
+            let lvl = min(1, max(0, smoothed))
+            DispatchQueue.main.async { [weak self] in self?.onLevel?(lvl) }
+        }
     }
 }
 

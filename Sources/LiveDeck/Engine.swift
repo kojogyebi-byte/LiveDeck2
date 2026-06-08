@@ -10,6 +10,29 @@ enum TransitionType: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+struct StreamDestination: Identifiable, Codable {
+    var id = UUID()
+    var name: String
+    var platform: String   // YouTube, Facebook Live, Twitch, Custom
+    var proto: String      // RTMP, RTMPS, SRT
+    var url: String
+    var key: String
+    var enabled: Bool = true
+
+    static let platforms = ["YouTube", "Facebook Live", "Twitch", "Custom"]
+    static let protocols = ["RTMP", "RTMPS", "SRT"]
+
+    static func preset(for platform: String) -> (proto: String, url: String) {
+        switch platform {
+        case "YouTube":       return ("RTMP",  "rtmp://a.rtmp.youtube.com/live2")
+        case "Facebook Live": return ("RTMPS", "rtmps://live-api-s.facebook.com:443/rtmp/")
+        case "Twitch":        return ("RTMP",  "rtmp://live.twitch.tv/app")
+        default:              return ("RTMP",  "")
+        }
+    }
+    var composedURL: String { key.isEmpty ? url : (url.hasSuffix("/") ? url + key : url + "/" + key) }
+}
+
 final class Engine: ObservableObject {
     @Published var width = 1280
     @Published var height = 720
@@ -41,6 +64,26 @@ final class Engine: ObservableObject {
     @Published var fileOutputActive = false
     @Published var programWindowActive = false
     @Published var rightTab = 0   // 0 = Audio Mixer, 1 = Overlays
+
+    @Published var streamDestinations: [StreamDestination] = [] { didSet { persistStreams() } }
+
+    func loadStreams() {
+        if let data = UserDefaults.standard.data(forKey: "streamDestinations"),
+           let list = try? JSONDecoder().decode([StreamDestination].self, from: data) {
+            streamDestinations = list
+        }
+    }
+    private func persistStreams() {
+        if let data = try? JSONEncoder().encode(streamDestinations) {
+            UserDefaults.standard.set(data, forKey: "streamDestinations")
+        }
+    }
+    func addStreamDestination() {
+        let p = StreamDestination.preset(for: "Custom")
+        streamDestinations.append(StreamDestination(name: "New destination", platform: "Custom",
+                                                    proto: p.proto, url: p.url, key: ""))
+    }
+    func removeStreamDestination(_ id: UUID) { streamDestinations.removeAll { $0.id == id } }
 
     private var transFrom: UUID?
     private var transitioning = false
@@ -84,6 +127,7 @@ final class Engine: ObservableObject {
         audioCapture.onLevel = { [weak self] lvl in self?.audioLevel = lvl }
         audioCapture.start(deviceID: selectedAudioDeviceID)
         if sources.isEmpty { for _ in 0..<5 { sources.append(EmptySource()) } }
+        loadStreams()
     }
 
     /// Replace a slot (e.g. a blank placeholder) with a real source in place.
