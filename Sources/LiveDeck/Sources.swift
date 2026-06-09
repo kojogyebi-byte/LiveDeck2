@@ -82,7 +82,6 @@ class Source: NSObject, ObservableObject, Identifiable {
         self.name = name
         self.kindLabel = kindLabel
         super.init()
-        meter.onLevel = { [weak self] lvl in self?.level = lvl }
     }
 
     func currentImage() -> CGImage? {
@@ -311,13 +310,13 @@ final class EmptySource: Source {
 final class InputAudioMeter: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
     private var session: AVCaptureSession?
     private let queue = DispatchQueue(label: "input.audio.meter")
-    var onLevel: ((Float) -> Void)?
+    private(set) var currentLevel: Float = 0   // read on main by the engine's meter timer
     private var smoothed: Float = 0
 
     func start(deviceID: String?) {
         stop()
         guard let id = deviceID, let dev = AVCaptureDevice(uniqueID: id),
-              let input = try? AVCaptureDeviceInput(device: dev) else { onLevel?(0); return }
+              let input = try? AVCaptureDeviceInput(device: dev) else { currentLevel = 0; return }
         let s = AVCaptureSession()
         if s.canAddInput(input) { s.addInput(input) }
         let out = AVCaptureAudioDataOutput()
@@ -327,14 +326,13 @@ final class InputAudioMeter: NSObject, AVCaptureAudioDataOutputSampleBufferDeleg
         session = s
     }
 
-    func stop() { session?.stopRunning(); session = nil; DispatchQueue.main.async { self.onLevel?(0) } }
+    func stop() { session?.stopRunning(); session = nil; currentLevel = 0 }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         if let ch = connection.audioChannels.first {
             let lin = Float(pow(10.0, Double(ch.averagePowerLevel) / 20.0))
             smoothed = max(lin, smoothed * 0.82)
-            let lvl = min(1, max(0, smoothed))
-            DispatchQueue.main.async { [weak self] in self?.onLevel?(lvl) }
+            currentLevel = min(1, max(0, smoothed))
         }
     }
 }
@@ -350,7 +348,7 @@ final class AudioCapture: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate
     private var session: AVCaptureSession?
     private let queue = DispatchQueue(label: "audio.queue")
     var onSampleBuffer: ((CMSampleBuffer) -> Void)?
-    var onLevel: ((Float) -> Void)?   // 0...1, smoothed, delivered on main
+    private(set) var currentLevel: Float = 0   // read on main by the engine's meter timer
     private var smoothed: Float = 0
 
     static func availableDevices() -> [AudioDeviceInfo] {
@@ -373,22 +371,16 @@ final class AudioCapture: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate
         session = s
     }
 
-    func stop() {
-        session?.stopRunning()
-        session = nil
-    }
+    func stop() { session?.stopRunning(); session = nil; currentLevel = 0 }
 
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
         onSampleBuffer?(sampleBuffer)
-        // Level meter from the connection's audio channels (dBFS → 0...1)
         if let ch = connection.audioChannels.first {
-            let db = ch.averagePowerLevel                       // typically -160...0 dBFS
-            let lin = Float(pow(10.0, Double(db) / 20.0))       // 0...1
-            smoothed = max(lin, smoothed * 0.82)                // fast attack, slow release
-            let level = min(1, max(0, smoothed))
-            DispatchQueue.main.async { [weak self] in self?.onLevel?(level) }
+            let lin = Float(pow(10.0, Double(ch.averagePowerLevel) / 20.0))
+            smoothed = max(lin, smoothed * 0.82)
+            currentLevel = min(1, max(0, smoothed))
         }
     }
 }

@@ -1,4 +1,6 @@
-# LiveDeck Studio (macOS) — v2.3  (loop, mixer + effects, resizable UI, stream settings)
+# LiveDeck Studio (macOS) — v2.3.1
+
+**Fixes in 2.3.1:** resolved the UI freeze on every click (audio meters now publish on a steady 12 Hz timer instead of flooding the main thread on every audio buffer), and the transition buttons (Fade/Wipe/Slide/Zoom) now highlight the selected type and act as a proper selector. Note: Fade/Wipe/Slide/Zoom only run a visible transition when a source is staged in **Preview** — with empty inputs they just select the type.
 
 A native Mac live production switcher: Preview/Program buses with a transition T-bar, an input bus with live thumbnails, an audio mixer with VU meters, animated overlay graphics with variants, multiview, and MP4 recording. Built with Swift, SwiftUI, AVFoundation and ScreenCaptureKit. Requires macOS 13 Ventura or newer.
 

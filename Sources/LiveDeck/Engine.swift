@@ -108,6 +108,7 @@ final class Engine: ObservableObject {
     private var adaptor: AVAssetWriterInputPixelBufferAdaptor?
     private let audioCapture = AudioCapture()
     private var recordTimer: Timer?
+    private var meterTimer: Timer?
     private var outputWindow: NSWindow?
 
     // MARK: lifecycle
@@ -124,10 +125,23 @@ final class Engine: ObservableObject {
             guard let self, self.isRecording, let input = self.audioInput, input.isReadyForMoreMediaData else { return }
             input.append(sb)
         }
-        audioCapture.onLevel = { [weak self] lvl in self?.audioLevel = lvl }
         audioCapture.start(deviceID: selectedAudioDeviceID)
+        // Publish meter levels at a steady ~12 Hz (NOT per audio buffer) to keep the UI responsive.
+        let mt = Timer(timeInterval: 1.0 / 12.0, repeats: true) { [weak self] _ in self?.publishMeters() }
+        mt.tolerance = 0.02
+        RunLoop.main.add(mt, forMode: .common)
+        meterTimer = mt
         if sources.isEmpty { for _ in 0..<5 { sources.append(EmptySource()) } }
         loadStreams()
+    }
+
+    private func publishMeters() {
+        let m = audioCapture.currentLevel
+        if abs(m - audioLevel) > 0.01 { audioLevel = m }
+        for s in sources {
+            let lvl = s.meter.currentLevel
+            if abs(lvl - s.level) > 0.01 { s.level = lvl }
+        }
     }
 
     /// Replace a slot (e.g. a blank placeholder) with a real source in place.

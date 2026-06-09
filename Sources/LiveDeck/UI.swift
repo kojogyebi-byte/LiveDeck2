@@ -131,10 +131,10 @@ struct TransitionColumn: View {
     var body: some View {
         VStack(spacing: 6) {
             XBtn("Cut", color: cProgram) { engine.cut() }
-            XBtn("Fade") { engine.quickTransition(.fade) }
-            XBtn("Wipe") { engine.quickTransition(.wipe) }
-            XBtn("Slide") { engine.quickTransition(.slide) }
-            XBtn("Zoom") { engine.quickTransition(.zoom) }
+            XBtn("Fade", color: engine.transition == .fade ? cPreview : cBtn) { engine.quickTransition(.fade) }
+            XBtn("Wipe", color: engine.transition == .wipe ? cPreview : cBtn) { engine.quickTransition(.wipe) }
+            XBtn("Slide", color: engine.transition == .slide ? cPreview : cBtn) { engine.quickTransition(.slide) }
+            XBtn("Zoom", color: engine.transition == .zoom ? cPreview : cBtn) { engine.quickTransition(.zoom) }
             XBtn("FTB", color: engine.ftbOn ? .red : cBtn) { engine.toggleFTB() }
             Divider()
             VStack(spacing: 4) {
